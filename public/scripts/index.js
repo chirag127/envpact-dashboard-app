@@ -2,8 +2,11 @@
       import { getSecretsFile, commitSecretsFile, getVaultRepo } from '/scripts/vault.js';
       import { resolveProject, findReferencingProjects, renderEnv, downloadEnv } from '/scripts/resolver.js';
 
-      // Build-time injection of OAuth client_id
-      window.__ENVPACT_CLIENT_ID__ = import.meta.env.PUBLIC_GITHUB_OAUTH_CLIENT_ID || '';
+      // (v0.3.0+ no longer needs the OAuth client_id in the browser —
+      // the /api/auth/* Pages Functions inject it server-side from
+      // wrangler.toml [vars]. The old window.__ENVPACT_CLIENT_ID__
+      // line was dead code and crashed at runtime in a static .js
+      // file because import.meta.env is undefined outside of Astro.)
 
       const app = document.getElementById('app');
       const userBar = document.getElementById('user-bar');
