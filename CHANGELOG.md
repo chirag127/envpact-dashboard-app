@@ -1,5 +1,43 @@
 # Changelog
 
+## [0.3.0] - 2026-06-16
+
+### Fixed
+
+- **"Connect GitHub" button is no longer broken.** The v0.2.0 button
+  POSTed directly to `github.com/login/device/code` from the browser,
+  which is silently blocked by CORS — GitHub's device-flow endpoints
+  do not send `Access-Control-Allow-Origin` for arbitrary origins, so
+  the fetch resolved with a CORS error, the `try/catch` showed an
+  unhelpful "TypeError: Failed to fetch", and to most users it just
+  looked like the button did nothing.
+
+  v0.3.0 ships two Cloudflare Pages Functions —
+  `functions/api/auth/device.ts` and `functions/api/auth/token.ts` —
+  that proxy the device-flow start and the token exchange through the
+  Pages edge. The browser calls `/api/auth/device` and
+  `/api/auth/token` (same-origin, no CORS issue); the Function adds
+  the OAuth `client_id` server-side from the `PUBLIC_GITHUB_OAUTH_CLIENT_ID`
+  env binding and forwards the request to GitHub. GitHub's response
+  body is returned verbatim, so the existing client polling / error
+  handling works without changes.
+
+### Changed
+
+- `public/scripts/auth.js` no longer reads
+  `window.__ENVPACT_CLIENT_ID__` — the static bundle does not need
+  the OAuth client_id at all anymore. The Pages Function is the only
+  thing that holds it. The build-time `PUBLIC_GITHUB_OAUTH_CLIENT_ID`
+  env binding is still required by the Function; we just stopped
+  baking it into the JS that ships to browsers.
+
+### Migration
+
+- After deploying v0.3.0, confirm `PUBLIC_GITHUB_OAUTH_CLIENT_ID` is
+  set as an environment variable on the Pages project (it should
+  already be — set in v0.2.0 deploy fix). The Functions need it at
+  runtime; the static bundle does not.
+
 ## [0.2.0] - 2026-06-16
 
 ### Security

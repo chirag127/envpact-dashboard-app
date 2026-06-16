@@ -1,29 +1,30 @@
 /**
- * GitHub OAuth Device Flow (no backend required).
+ * GitHub OAuth Device Flow — proxied through Cloudflare Pages Functions.
  *
- * GitHub OAuth Apps with the device flow let us authenticate users
- * 100% client-side — perfect for a static Cloudflare Pages dashboard.
+ * GitHub's device-flow endpoints (`/login/device/code`,
+ * `/login/oauth/access_token`) do NOT send Access-Control-Allow-Origin
+ * for arbitrary browser origins, so the previous v0.2.0 implementation
+ * that POSTed straight to github.com from the browser was blocked by
+ * CORS in every browser. The "Connect GitHub" button silently failed.
  *
- * Flow:
- *   1. POST https://github.com/login/device/code with client_id
- *      → returns user_code, verification_uri, device_code, interval.
- *   2. Show the user_code; open verification_uri.
- *   3. Poll https://github.com/login/oauth/access_token until granted.
+ * v0.3.0 fixes this by proxying both calls through Pages Functions
+ * shipped alongside this dashboard:
+ *
+ *   /api/auth/device  → POSTs to github.com/login/device/code
+ *   /api/auth/token   → POSTs to github.com/login/oauth/access_token
+ *
+ * Both are same-origin so CORS does not apply. The Function injects
+ * the OAuth client_id from the deployment's env binding, so the
+ * browser bundle no longer needs to ship it.
  *
  * The access token is stored ONLY in sessionStorage (cleared on tab
  * close). It is never persisted in localStorage and never sent to
- * any third party — every API call goes directly to api.github.com.
+ * any third party — every API call after auth still goes directly
+ * to api.github.com.
  */
 
-const CLIENT_ID =
-  // Set at build time via wrangler / .env
-  // (Astro exposes import.meta.env.PUBLIC_GITHUB_OAUTH_CLIENT_ID at build time;
-  //  for runtime injection, the script-tag fallback below also works.)
-  (typeof window !== 'undefined' && window.__ENVPACT_CLIENT_ID__) ||
-  '';
-
-const DEVICE_URL = 'https://github.com/login/device/code';
-const TOKEN_URL = 'https://github.com/login/oauth/access_token';
+const DEVICE_URL = '/api/auth/device';
+const TOKEN_URL = '/api/auth/token';
 const GITHUB_API = 'https://api.github.com';
 
 const SESSION_TOKEN_KEY = 'envpact_gh_token';
@@ -44,22 +45,18 @@ export function clearAuth() {
 }
 
 export async function startDeviceFlow(scope = 'repo') {
-  if (!CLIENT_ID) {
-    throw new Error(
-      'GitHub OAuth client_id not configured. Set PUBLIC_GITHUB_OAUTH_CLIENT_ID at build time.'
-    );
-  }
-  // Some browsers block CORS to github.com from arbitrary origins.
-  // GitHub's device flow endpoints DO support CORS for origins
-  // listed in your OAuth app's "Application URL". Configure
-  // https://envpact.oriz.in there.
   const r = await fetch(DEVICE_URL, {
     method: 'POST',
     headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
-    body: JSON.stringify({ client_id: CLIENT_ID, scope }),
+    body: JSON.stringify({ scope }),
   });
   if (!r.ok) {
-    throw new Error(`device flow start failed: ${r.status} ${r.statusText}`);
+    let detail = '';
+    try {
+      const data = await r.json();
+      detail = data.error_description || data.error || '';
+    } catch (_e) { /* non-JSON response */ }
+    throw new Error(`device flow start failed: ${r.status}${detail ? ` — ${detail}` : ''}`);
   }
   return await r.json();
 }
@@ -70,13 +67,14 @@ export async function pollForToken(deviceCode, interval) {
     const r = await fetch(TOKEN_URL, {
       method: 'POST',
       headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        client_id: CLIENT_ID,
-        device_code: deviceCode,
-        grant_type: 'urn:ietf:params:oauth:grant-type:device_code',
-      }),
+      body: JSON.stringify({ device_code: deviceCode }),
     });
-    const data = await r.json();
+    let data;
+    try {
+      data = await r.json();
+    } catch (_e) {
+      throw new Error(`device flow token endpoint returned non-JSON (status ${r.status})`);
+    }
     if (data.access_token) return data.access_token;
     if (data.error === 'authorization_pending') continue;
     if (data.error === 'slow_down') {
