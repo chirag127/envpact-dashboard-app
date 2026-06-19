@@ -1,0 +1,6 @@
+# Astro 5 + Vite use esbuild for transforms and ship sharp for
+# image optimisation. Both need their install scripts to run.
+
+allowBuilds:
+  esbuild: true
+  sharp: true

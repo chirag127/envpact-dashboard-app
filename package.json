@@ -5,7 +5,10 @@
   "private": true,
   "description": "Web dashboard for envpact — visual secret management via GitHub OAuth",
   "homepage": "https://envpact.oriz.in",
-  "repository": { "type": "git", "url": "git+https://github.com/chirag127/envpact-dashboard.git" },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/chirag127/envpact-dashboard.git"
+  },
   "license": "MIT",
   "scripts": {
     "dev": "astro dev",
@@ -16,5 +19,6 @@
   },
   "dependencies": {
     "astro": "^5.0.0"
-  }
+  },
+  "packageManager": "pnpm@11.8.0"
 }
