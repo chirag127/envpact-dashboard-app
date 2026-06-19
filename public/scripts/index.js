@@ -8,8 +8,9 @@ import {
   entryValue,
   entryModifiedAt,
   latestModifiedAt,
-  formatRelative,
 } from '/scripts/resolver.js';
+import { formatTimestamp } from '/scripts/timestamps.js';
+import { downloadGlobalEnv } from '/scripts/global-env.js';
 
 const app = document.getElementById('app');
 const userBar = document.getElementById('user-bar');
@@ -18,6 +19,25 @@ function escapeHtml(s) {
   return String(s).replace(/[&<>"']/g, c => ({
     '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
   }[c]));
+}
+
+/**
+ * Dual-render a vault `_modified_at` ISO timestamp for a table cell.
+ * Visible text = IST (Asia/Kolkata, host-TZ independent).
+ * Tooltip (`title=`) = canonical UTC string + IST below it, so
+ * hovering reveals both per SHARED_SPEC §1.5.
+ *
+ * Returns { html, title } so callers can drop the markup directly.
+ * Both fields are HTML-escaped.
+ */
+function renderTimestampCell(iso) {
+  const ts = formatTimestamp(iso);
+  if (!ts) return { html: '<span class="muted-cell">—</span>', title: '' };
+  const titleAttr = `${ts.utc} (UTC)\n${ts.ist}`;
+  return {
+    html: `<span class="muted-cell" title="${escapeHtml(titleAttr)}">${escapeHtml(ts.ist)}</span>`,
+    title: titleAttr,
+  };
 }
 
 function renderUserBar() {
@@ -86,6 +106,17 @@ function renderVault(vault, _sha) {
   const sharedKeys = Object.keys(vault.shared || {}).sort();
 
   app.innerHTML = `
+    <div class="global-env-bar">
+      <div>
+        <button class="secondary" id="download-global-env">Download global .env</button>
+        <div class="global-env-hint">
+          Save this to <code>~/.envpact/.env</code> to expose every shared
+          secret to your shell. <code>envpact-cli --sync-global</code> does
+          this automatically.
+        </div>
+      </div>
+    </div>
+
     <h2>Projects (${projects.length})</h2>
     <div class="panel">
       ${projects.length === 0 ? '<p class="empty">No projects yet. Add some with envpact-cli.</p>' : `
@@ -99,14 +130,13 @@ function renderVault(vault, _sha) {
                 ? ` <span class="badge encrypted">decryption unsupported (${encCount})</span>`
                 : '';
               const latest = latestModifiedAt(proj);
-              const rel = latest ? formatRelative(latest) : '—';
-              const titleAttr = latest ? ` title="${escapeHtml(latest)}"` : '';
+              const lastMod = renderTimestampCell(latest);
               return `
                 <tr>
                   <td><button class="secondary toggle-perkey" data-project="${escapeHtml(name)}" aria-expanded="false" style="padding:2px 8px;">▸</button></td>
                   <td><strong>${escapeHtml(name)}</strong>${encBadge}</td>
                   <td>${keyCount}</td>
-                  <td><span class="muted-cell"${titleAttr}>${escapeHtml(rel)}</span></td>
+                  <td>${lastMod.html}</td>
                   <td>
                     <button class="secondary download-env" data-project="${escapeHtml(name)}">Download .env</button>
                   </td>
@@ -133,14 +163,13 @@ function renderVault(vault, _sha) {
               const enc = typeof v === 'string' && v.startsWith('enc:');
               const refs = findReferencingProjects(vault, k);
               const m = entryModifiedAt(entry);
-              const rel = m ? formatRelative(m) : '—';
-              const titleAttr = m ? ` title="${escapeHtml(m)}"` : '';
+              const lastMod = renderTimestampCell(m);
               return `
                 <tr>
                   <td><code>${escapeHtml(k)}</code></td>
                   <td>${enc ? '<span class="badge encrypted">encrypted</span>' : '<span class="badge">plain</span>'}</td>
                   <td>${refs.length} reference${refs.length === 1 ? '' : 's'}</td>
-                  <td><span class="muted-cell"${titleAttr}>${escapeHtml(rel)}</span></td>
+                  <td>${lastMod.html}</td>
                 </tr>`;
             }).join('')}
           </tbody>
@@ -159,6 +188,18 @@ function renderVault(vault, _sha) {
       </p>
     </div>
   `;
+
+  // Wire up the global .env download button.
+  const globalBtn = app.querySelector('#download-global-env');
+  if (globalBtn) {
+    globalBtn.addEventListener('click', () => {
+      // global-env.js walks vault.shared.* alphabetically and produces
+      // KEY=value lines (quoted per §5). Encrypted entries become
+      // `# KEY: encrypted — decrypt-via-cli` comment lines — no
+      // ciphertext ever lands in the downloaded file.
+      downloadGlobalEnv(vault);
+    });
+  }
 
   // Wire up download buttons (single-env per project — no prompt).
   for (const btn of app.querySelectorAll('.download-env')) {
@@ -232,25 +273,20 @@ function renderPerKeyPanel(vault, projectName) {
     const entry = proj[k];
     const v = entryValue(entry);
     const m = entryModifiedAt(entry);
-    let status = 'synced';
     let statusBadge = '<span class="badge">synced</span>';
     if (v === null) {
-      status = 'invalid';
       statusBadge = '<span class="badge encrypted">invalid</span>';
     } else if (typeof v === 'string' && v.startsWith('enc:')) {
-      status = 'encrypted';
       statusBadge = '<span class="badge encrypted">encrypted</span>';
     } else if (typeof v === 'string' && v.startsWith('shared.')) {
-      status = 'shared-ref';
       statusBadge = '<span class="badge">shared ref</span>';
     }
-    const rel = m ? formatRelative(m) : '—';
-    const titleAttr = m ? ` title="${escapeHtml(m)}"` : '';
+    const lastMod = renderTimestampCell(m);
     return `
       <tr>
         <td><code>${escapeHtml(k)}</code></td>
         <td>${statusBadge}</td>
-        <td><span class="muted-cell"${titleAttr}>${escapeHtml(rel)}</span></td>
+        <td>${lastMod.html}</td>
       </tr>`;
   }).join('');
   return banner + `
