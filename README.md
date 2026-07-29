@@ -1,13 +1,15 @@
-# envpact-dashboard
+# envpact-dashboard-app
 
+[![Live](https://img.shields.io/badge/live-envpact--dashboard--app.oriz.in-2ea44f)](https://envpact-dashboard-app.oriz.in)
+[![Stars](https://img.shields.io/github/stars/chirag127/envpact-dashboard-app?style=social)](https://github.com/chirag127/envpact-dashboard-app/stargazers)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Deploy](https://github.com/chirag127/envpact-dashboard/actions/workflows/deploy.yml/badge.svg)](https://github.com/chirag127/envpact-dashboard/actions/workflows/deploy.yml)
+[![CI](https://github.com/chirag127/envpact-dashboard-app/actions/workflows/ci.yml/badge.svg)](https://github.com/chirag127/envpact-dashboard-app/actions/workflows/ci.yml)
 
 Web dashboard for **envpact** — manage your private secrets vault
 visually via GitHub OAuth.
 
-> Live at **[envpact.oriz.in](https://envpact.oriz.in)** (and
-> mirrored at [envpact-dashboard.pages.dev](https://envpact-dashboard.pages.dev)).
+> Live at **[envpact-dashboard-app.oriz.in](https://envpact-dashboard-app.oriz.in)** (also
+> [envpact.oriz.in](https://envpact.oriz.in), mirrored at [envpact-dashboard.pages.dev](https://envpact-dashboard.pages.dev)).
 
 Part of the [envpact](https://github.com/chirag127/envpact)
 ecosystem.
