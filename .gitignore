@@ -2,6 +2,7 @@ node_modules/
 dist/
 .astro/
 .wrangler/
+package-lock.json
 .env
 .env.*
 !.env.example

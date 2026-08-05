@@ -1,357 +1,103 @@
 ---
-const title = 'envpact — centralized secrets dashboard';
-const description = 'Manage your envpact private vault visually via GitHub OAuth. No backend, no third-party storage.';
+import BaseLayout from '../layouts/BaseLayout.astro';
+import CutKey from '../components/CutKey.astro';
+
+const title = 'envpact — the vault escutcheon';
+const description =
+  'View your envpact secrets vault through the browser. Keys live in your own private GitHub repo; the dashboard reads them via GitHub OAuth — no envpact server, no third-party storage.';
 ---
 
-<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="description" content={description} />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <title>{title}</title>
-    <style is:global>
-      :root {
-        --bg: #0e1117;
-        --panel: #161b22;
-        --border: #30363d;
-        --text: #c9d1d9;
-        --muted: #8b949e;
-        --accent: #2ea043;
-        --accent-hover: #3fb950;
-        --danger: #f85149;
-        --warning: #d29922;
-        --code-bg: #1c2128;
-      }
-      @media (prefers-color-scheme: light) {
-        :root {
-          --bg: #ffffff;
-          --panel: #f6f8fa;
-          --border: #d0d7de;
-          --text: #1f2328;
-          --muted: #59636e;
-          --accent: #1f883d;
-          --accent-hover: #2da44e;
-          --danger: #cf222e;
-          --warning: #9a6700;
-          --code-bg: #eaeef2;
-        }
-      }
-      * { box-sizing: border-box; }
-      html, body {
-        margin: 0;
-        padding: 0;
-        background: var(--bg);
-        color: var(--text);
-        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-        font-size: 14px;
-        line-height: 1.5;
-      }
-      header {
-        border-bottom: 1px solid var(--border);
-        padding: 16px 24px;
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        background: var(--panel);
-      }
-      header h1 {
-        font-size: 18px;
-        font-weight: 600;
-        margin: 0;
-        display: flex;
-        align-items: center;
-        gap: 8px;
-      }
-      header h1::before { content: '🔒'; }
-      main { padding: 24px; max-width: 1200px; margin: 0 auto; }
-      h2 { margin-top: 32px; font-size: 16px; font-weight: 600; }
-      .panel {
-        background: var(--panel);
-        border: 1px solid var(--border);
-        border-radius: 6px;
-        padding: 16px;
-      }
-      button {
-        background: var(--accent);
-        color: white;
-        border: none;
-        padding: 8px 16px;
-        border-radius: 6px;
-        font-size: 14px;
-        font-weight: 500;
-        cursor: pointer;
-      }
-      button:hover { background: var(--accent-hover); }
-      button.secondary {
-        background: var(--panel);
-        color: var(--text);
-        border: 1px solid var(--border);
-      }
-      button.danger { background: var(--danger); }
-      input, select, textarea {
-        background: var(--bg);
-        color: var(--text);
-        border: 1px solid var(--border);
-        border-radius: 6px;
-        padding: 6px 12px;
-        font-size: 14px;
-        font-family: inherit;
-      }
-      code, .auth-code {
-        background: var(--code-bg);
-        padding: 2px 6px;
-        border-radius: 4px;
-        font-family: 'SF Mono', Consolas, 'Liberation Mono', monospace;
-      }
-      .auth-dialog {
-        position: fixed; inset: 0;
-        background: rgba(0,0,0,0.5);
-        display: flex; align-items: center; justify-content: center;
-        z-index: 100;
-      }
-      .auth-card {
-        background: var(--panel);
-        border: 1px solid var(--border);
-        border-radius: 12px;
-        padding: 32px;
-        max-width: 480px;
-        text-align: center;
-      }
-      .auth-code {
-        display: inline-block;
-        font-size: 28px;
-        padding: 12px 24px;
-        margin: 16px 0;
-        letter-spacing: 4px;
-      }
-      .auth-hint { color: var(--muted); font-size: 12px; }
-      table { width: 100%; border-collapse: collapse; }
-      th, td { text-align: left; padding: 8px 12px; border-bottom: 1px solid var(--border); }
-      th { font-weight: 600; color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; }
-      .badge { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 11px; background: var(--code-bg); }
-      .badge.encrypted { color: var(--warning); }
-      .footer {
-        margin-top: 64px;
-        padding: 24px;
-        text-align: center;
-        color: var(--muted);
-        font-size: 12px;
-        border-top: 1px solid var(--border);
-      }
-      .footer a { color: var(--muted); }
-      .empty {
-        text-align: center;
-        padding: 64px 24px;
-        color: var(--muted);
-      }
-      .login-hero {
-        text-align: center;
-        padding: 96px 24px;
-      }
-      .login-hero h2 {
-        font-size: 28px;
-        margin: 0 0 16px;
-      }
-      .login-hero p {
-        color: var(--muted);
-        max-width: 600px;
-        margin: 0 auto 24px;
-      }
-      .privacy-note {
-        background: var(--code-bg);
-        border-left: 3px solid var(--accent);
-        padding: 12px 16px;
-        margin: 24px auto;
-        max-width: 600px;
-        text-align: left;
-        font-size: 13px;
-      }
-      .muted-cell { color: var(--muted); font-size: 12px; }
-      .perkey-row[hidden] { display: none; }
-      .perkey-panel {
-        padding: 12px 0 4px;
-      }
-      .perkey-banner {
-        background: var(--code-bg);
-        border-left: 3px solid var(--warning);
-        padding: 8px 12px;
-        margin-bottom: 12px;
-        font-size: 12px;
-        color: var(--muted);
-      }
-      .perkey-banner a { color: var(--accent); }
-      .perkey-table { margin-top: 4px; }
-      .perkey-table th, .perkey-table td {
-        padding: 6px 12px;
-        font-size: 12px;
-      }
-      .toggle-perkey {
-        font-family: monospace;
-        line-height: 1;
-      }
-      .global-env-bar {
-        display: flex;
-        align-items: flex-start;
-        justify-content: space-between;
-        gap: 16px;
-        margin: 16px 0 8px;
-      }
-      .global-env-hint {
-        color: var(--muted);
-        font-size: 12px;
-        margin-top: 6px;
-        max-width: 640px;
-      }
-      /* ─── marketing landing block (shown above the login hero) ─── */
-      .marketing {
-        max-width: 820px;
-        margin: 32px auto 8px;
-        padding: 0 16px;
-        text-align: center;
-      }
-      .marketing .tagline {
-        font-size: 18px;
-        color: var(--muted);
-        margin: 0 auto 24px;
-        max-width: 640px;
-        line-height: 1.5;
-      }
-      .feature-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-        gap: 16px;
-        margin: 32px 0;
-        text-align: left;
-      }
-      .feature-card {
-        background: var(--panel);
-        border: 1px solid var(--border);
-        border-radius: 8px;
-        padding: 16px;
-      }
-      .feature-card h3 {
-        margin: 0 0 8px;
-        font-size: 14px;
-        color: var(--accent);
-      }
-      .feature-card p {
-        margin: 0;
-        font-size: 13px;
-        color: var(--muted);
-        line-height: 1.5;
-      }
-      .install-block {
-        background: var(--code-bg);
-        border: 1px solid var(--border);
-        border-radius: 6px;
-        padding: 12px 16px;
-        font-family: monospace;
-        font-size: 13px;
-        text-align: left;
-        margin: 16px auto;
-        max-width: 600px;
-        overflow-x: auto;
-      }
-      .install-block .comment { color: var(--muted); }
-      .components {
-        margin: 32px 0 16px;
-        font-size: 13px;
-        color: var(--muted);
-      }
-      .components strong { color: var(--text); }
-      .components code {
-        background: var(--code-bg);
-        padding: 2px 6px;
-        border-radius: 3px;
-        font-size: 12px;
-      }
-    </style>
-  </head>
-  <body>
-    <header>
-      <h1>envpact</h1>
-      <div id="user-bar"></div>
-    </header>
-    <main>
-      <!-- Marketing block: shown above the dashboard. Hides itself
-           after login via JS so it doesn't take up space when the
-           user is actually using the tool. -->
-      <section class="marketing" id="marketing">
-        <p class="tagline">
-          Centralized secrets manager for AI coding agents. Your secrets live in
-          <strong>your own private GitHub repo</strong>; envpact reads them into
-          project-scoped <code>.env</code> files. No third-party server, no
-          plaintext-in-public-repo risk, one-rotate updates every project.
+<BaseLayout title={title} description={description}>
+  <main>
+    <!-- HERO — cut-key thesis. Signed-in JS hides #marketing; this
+         block is the first-visit pitch. -->
+    <section class="hero">
+      <div class="hero-copy">
+        <p class="hero-eyebrow">your vault · your keys · your account</p>
+        <h1>Cut a clean <em>.env</em> from a vault only you can open.</h1>
+        <p class="hero-lede">
+          Your secrets live in <code>&lt;you&gt;/envpact-secrets</code> — a
+          private GitHub repo. This dashboard is the escutcheon: it reads and
+          writes that vault straight from your browser via the GitHub API. No
+          envpact server ever sees a token.
         </p>
-
-        <div class="feature-grid">
-          <div class="feature-card">
-            <h3>Your vault, your account</h3>
-            <p>Secrets are stored in <code>&lt;your-username&gt;/envpact-secrets</code> on GitHub — a private repo only you can read. envpact never sees a token of yours.</p>
-          </div>
-          <div class="feature-card">
-            <h3>One key, many projects</h3>
-            <p>Define <code>OPENAI_API_KEY</code> once in shared. Every project that references <code>shared.OPENAI_API_KEY</code> picks up the new value next run.</p>
-          </div>
-          <div class="feature-card">
-            <h3>Works with your AI agent</h3>
-            <p>MCP server for Claude Code, Cursor, Windsurf, Cline, Goose. CLI, VS Code extension, GitHub Action, Python module. Pick your tool.</p>
-          </div>
-          <div class="feature-card">
-            <h3>Browser-only dashboard</h3>
-            <p>This page reads and writes your vault directly via the GitHub API. No envpact server is involved. Your token stays in this tab only.</p>
-          </div>
+        <div class="hero-cta">
+          <a class="btn" href="#connect">Open your vault</a>
+          <a class="btn secondary" href="https://chirag127.github.io/envpact/" rel="noopener">Read the docs</a>
         </div>
+      </div>
+      <CutKey />
+    </section>
 
-        <div class="install-block">
-          <span class="comment"># add envpact to any AI agent that speaks MCP</span><br/>
-          npx -y envpact-mcp<br/>
-          <br/>
-          <span class="comment"># or use the CLI to generate .env from your vault</span><br/>
-          npx -y envpact-cli
+    <!-- Marketing block (hidden by index.js once GitHub-signed-in). -->
+    <section class="marketing" id="marketing">
+      <h2 data-seq="A">How the vault works</h2>
+      <p class="tagline">
+        One centralized secrets manager for every AI coding agent. Define a key
+        once in <strong>shared</strong>; every project that references it picks up
+        the new value on the next run. One rotate updates them all.
+      </p>
+
+      <div class="feature-grid">
+        <div class="feature-card" data-tag="VAULT">
+          <h3>Your vault, your account</h3>
+          <p>Secrets sit in <code>&lt;you&gt;/envpact-secrets</code> on GitHub — a private repo only you can read. envpact never holds a token of yours.</p>
         </div>
+        <div class="feature-card" data-tag="SHARED">
+          <h3>One key, many projects</h3>
+          <p>Set <code>OPENAI_API_KEY</code> once in shared. Every project that references <code>shared.OPENAI_API_KEY</code> resolves the new value next run.</p>
+        </div>
+        <div class="feature-card" data-tag="AGENTS">
+          <h3>Works with your agent</h3>
+          <p>MCP server for Claude Code, Cursor, Windsurf, Cline, Goose. Plus CLI, VS Code extension, GitHub Action, Python module.</p>
+        </div>
+        <div class="feature-card" data-tag="BROWSER">
+          <h3>Browser-only dashboard</h3>
+          <p>This page reads and writes your vault directly via the GitHub API. Your token stays in this tab's session only.</p>
+        </div>
+      </div>
 
-        <p class="components">
-          Components: <a href="https://github.com/chirag127/envpact-cli"><strong>CLI</strong></a> ·
-          <a href="https://github.com/chirag127/envpact-mcp"><strong>MCP server</strong></a> ·
-          <a href="https://github.com/chirag127/envpact-action"><strong>GitHub Action</strong></a> ·
-          <a href="https://marketplace.visualstudio.com/items?itemName=chirag127.envpact"><strong>VS Code extension</strong></a> ·
-          <a href="https://pypi.org/project/envpact/"><strong>Python package</strong></a>
-        </p>
-        <p class="components">
-          <a href="https://chirag127.github.io/envpact/"><strong>Full documentation →</strong></a>
-        </p>
-      </section>
+      <div class="install-block">
+        <span class="comment"># add envpact to any agent that speaks MCP</span><br />
+        <span class="cmd">npx -y envpact-mcp</span><br /><br />
+        <span class="comment"># or generate .env from your vault with the CLI</span><br />
+        <span class="cmd">npx -y envpact-cli</span>
+      </div>
 
-      <div id="app">
+      <p class="components">
+        Components:
+        <a href="https://github.com/chirag127/envpact-cli"><strong>CLI</strong></a> ·
+        <a href="https://github.com/chirag127/envpact-mcp"><strong>MCP server</strong></a> ·
+        <a href="https://github.com/chirag127/envpact-action"><strong>GitHub Action</strong></a> ·
+        <a href="https://marketplace.visualstudio.com/items?itemName=chirag127.envpact"><strong>VS Code</strong></a> ·
+        <a href="https://pypi.org/project/envpact/"><strong>Python</strong></a>
+      </p>
+    </section>
+
+    <!-- #app — the vault dashboard (rendered by /scripts/index.js).
+         Contains .login-hero + #login-btn when signed out of GitHub. -->
+    <div id="app">
+      <h2 id="connect" data-seq="B">Connect your vault</h2>
+      <div class="panel">
         <div class="login-hero">
-          <h2>Centralized secrets, served from your private vault</h2>
+          <h2>Sign in with GitHub to open your vault</h2>
           <p>
-            Your envpact-secrets repo on GitHub is the single source of
-            truth. This dashboard reads &amp; writes it directly from
-            your browser via the GitHub API — no backend.
+            Your envpact-secrets repo is the single source of truth. This
+            dashboard reads and writes it directly from your browser — no backend.
           </p>
           <button id="login-btn">Connect GitHub</button>
           <div class="privacy-note">
-            <strong>Privacy model:</strong> your access token is stored
-            ONLY in this tab's <code>sessionStorage</code> (cleared on
-            close). Every API call goes directly to
-            <code>api.github.com</code>. No envpact server is involved.
+            <strong>Privacy model:</strong> your access token is stored only in
+            this tab's <code>sessionStorage</code> (cleared on close). Every API
+            call goes straight to <code>api.github.com</code>. No envpact server
+            is involved.
           </div>
         </div>
       </div>
-    </main>
-    <div class="footer">
-      <a href="https://github.com/chirag127/envpact">github.com/chirag127/envpact</a>
-      &nbsp;•&nbsp;
-      <a href="https://github.com/chirag127/envpact-cli">CLI</a>
-      &nbsp;•&nbsp;
-      <a href="https://github.com/chirag127/envpact-mcp">MCP</a>
-      &nbsp;•&nbsp;
-      <a href="https://pypi.org/project/envpact/">Python</a>
     </div>
-    <script type="module" src="/scripts/index.js"></script>
-  </body>
-</html>
+
+    <div id="pinned-mount"></div>
+  </main>
+
+  <script type="module" src="/scripts/index.js"></script>
+</BaseLayout>

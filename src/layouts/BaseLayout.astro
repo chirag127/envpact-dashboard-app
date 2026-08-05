@@ -1,0 +1,45 @@
+---
+import '../styles/theme.css';
+import Wordmark from '../components/Wordmark.astro';
+import DashboardShell from '../components/DashboardShell.tsx';
+
+interface Props {
+  title: string;
+  description: string;
+}
+const { title, description } = Astro.props;
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content={description} />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <title>{title}</title>
+  </head>
+  <body>
+    <header class="plate-header">
+      <Wordmark subtitle="vault" size={19} href="/" />
+      <div class="head-right">
+        <a class="head-linkmark" href="https://oriz.in" rel="noopener">oriz.in</a>
+        <div id="user-bar"></div>
+        <DashboardShell client:load />
+      </div>
+    </header>
+    <slot />
+    <footer class="plate-footer">
+      <span class="foot-stamp">Client-side · no envpact server</span>
+      <nav class="foot-links">
+        <a href="https://oriz.in">oriz.in</a>
+        <a href="https://github.com/chirag127/envpact">source</a>
+        <a href="https://github.com/chirag127/envpact-cli">cli</a>
+        <a href="https://github.com/chirag127/envpact-mcp">mcp</a>
+        <a href="https://pypi.org/project/envpact/">python</a>
+      </nav>
+    </footer>
+  </body>
+</html>
