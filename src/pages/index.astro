@@ -1,103 +1,187 @@
 ---
-import BaseLayout from '../layouts/BaseLayout.astro';
-import CutKey from '../components/CutKey.astro';
+import Station from '../layouts/Station.astro';
+import AccountPanel from '../components/AccountPanel.jsx';
 
-const title = 'envpact — the vault escutcheon';
+const title = 'envpact field station — environmental-impact readings';
 const description =
-  'View your envpact secrets vault through the browser. Keys live in your own private GitHub repo; the dashboard reads them via GitHub OAuth — no envpact server, no third-party storage.';
+  'A monitoring instrument for carbon intensity, air quality, and sequestered load. Public station reads for everyone; keep a personal baseline with your oriz account.';
+
+// KPI tiles — each an instrument face with a sparkline.
+const tiles = [
+  { accent: 'ochre', label: 'Carbon intensity', value: '312', unit: 'gCO₂/kWh', trend: '-4.8% vs 24h', dir: 'down', spark: [18, 15, 17, 13, 14, 11, 12, 9, 10, 8] },
+  { accent: 'verdigris', label: 'Sequestered load', value: '1.84', unit: 'kt CO₂e', trend: '+2.1% vs 24h', dir: 'up', spark: [6, 7, 7, 9, 10, 11, 13, 14, 16, 18] },
+  { accent: 'ochre', label: 'Renewable share', value: '58', unit: '%', trend: '+1.3 pts vs 24h', dir: 'down', spark: [8, 9, 10, 10, 12, 13, 14, 15, 16, 17] },
+  { accent: 'clay', label: 'PM2.5 exceedance', value: '3', unit: 'stations', trend: '2 cleared today', dir: 'up', spark: [4, 5, 6, 5, 6, 7, 5, 4, 3, 3] },
+];
+
+function sparkPath(vals) {
+  const max = Math.max(...vals), min = Math.min(...vals);
+  const span = max - min || 1;
+  const step = 100 / (vals.length - 1);
+  return vals.map((v, i) => {
+    const x = (i * step).toFixed(1);
+    const y = (28 - ((v - min) / span) * 24).toFixed(1);
+    return `${i === 0 ? 'M' : 'L'}${x},${y}`;
+  }).join(' ');
+}
+
+const carbon = [46, 45, 44, 43, 41, 40, 42, 47, 52, 55, 54, 51, 49, 48, 47, 46, 48, 53, 57, 55, 50, 46, 43, 41];
+const offset = [10, 10, 11, 11, 12, 13, 15, 18, 22, 26, 29, 31, 33, 34, 34, 33, 31, 28, 25, 22, 19, 16, 14, 12];
+const CW = 720, CH = 240, PAD = 34;
+const xAt = (i) => PAD + (i / 23) * (CW - PAD * 2);
+const yAt = (v) => CH - PAD - (v / 60) * (CH - PAD * 2);
+const linePath = (arr) => arr.map((v, i) => `${i === 0 ? 'M' : 'L'}${xAt(i).toFixed(1)},${yAt(v).toFixed(1)}`).join(' ');
+const areaPath = (arr) => `${linePath(arr)} L${xAt(23).toFixed(1)},${(CH - PAD).toFixed(1)} L${PAD.toFixed(1)},${(CH - PAD).toFixed(1)} Z`;
+
+const log = [
+  { station: 'ARR-04 Ridgeline', metric: 'PM2.5', reading: '11.2 µg/m³', ts: '14:20 IST', flag: 'ok' },
+  { station: 'ARR-11 Estuary', metric: 'CO₂ flux', reading: '-0.9 t/hr', ts: '14:18 IST', flag: 'ok' },
+  { station: 'ARR-07 Foundry', metric: 'NOₓ', reading: '84 ppb', ts: '14:15 IST', flag: 'watch' },
+  { station: 'ARR-02 Basin', metric: 'PM2.5', reading: '38.5 µg/m³', ts: '14:11 IST', flag: 'alert' },
+  { station: 'ARR-09 Canopy', metric: 'Sequestration', reading: '+2.4 t CO₂e', ts: '14:06 IST', flag: 'ok' },
+];
+
+// Isopleth contour: a smooth wandering line built from two out-of-phase
+// harmonics so the five bands nest and cross like a topographic reading
+// rather than parallel chart lines. Rendered as a Catmull-ish smooth path.
+function contour(seed, amp, base) {
+  const pts = 12;
+  const pt = [];
+  for (let i = 0; i <= pts; i++) {
+    const x = (i / pts) * 560;
+    const y =
+      base +
+      Math.sin(i * 0.62 + seed) * amp +
+      Math.cos(i * 1.31 + seed * 2.1) * (amp * 0.42) +
+      Math.sin(i * 0.27 + seed * 0.7) * (amp * 0.3);
+    pt.push([x, y]);
+  }
+  let d = `M${pt[0][0].toFixed(1)},${pt[0][1].toFixed(1)}`;
+  for (let i = 0; i < pt.length - 1; i++) {
+    const [x0, y0] = pt[i];
+    const [x1, y1] = pt[i + 1];
+    const cx = ((x0 + x1) / 2).toFixed(1);
+    d += ` Q${x0.toFixed(1)},${y0.toFixed(1)} ${cx},${((y0 + y1) / 2).toFixed(1)}`;
+  }
+  return d;
+}
 ---
 
-<BaseLayout title={title} description={description}>
-  <main>
-    <!-- HERO — cut-key thesis. Signed-in JS hides #marketing; this
-         block is the first-visit pitch. -->
-    <section class="hero">
-      <div class="hero-copy">
-        <p class="hero-eyebrow">your vault · your keys · your account</p>
-        <h1>Cut a clean <em>.env</em> from a vault only you can open.</h1>
-        <p class="hero-lede">
-          Your secrets live in <code>&lt;you&gt;/envpact-secrets</code> — a
-          private GitHub repo. This dashboard is the escutcheon: it reads and
-          writes that vault straight from your browser via the GitHub API. No
-          envpact server ever sees a token.
+<Station title={title} description={description}>
+  <section class="hero">
+    <div class="wrap hero-grid">
+      <div>
+        <span class="chan">CH·<b>ENV</b> / FIELD STATION / LIVE READ</span>
+        <h1>Read the field before<br /> you <em>read the report.</em></h1>
+        <p class="hero-lead">
+          envpact draws every sensor in the network into one instrument:
+          carbon intensity, air quality, and the load you pull back out of
+          the air. Contours below map this hour's reading across the grid.
         </p>
         <div class="hero-cta">
-          <a class="btn" href="#connect">Open your vault</a>
-          <a class="btn secondary" href="https://chirag127.github.io/envpact/" rel="noopener">Read the docs</a>
+          <a class="btn primary" href="#readings">See the readings</a>
+          <a class="btn ghost" href="#account">Keep a baseline</a>
         </div>
       </div>
-      <CutKey />
-    </section>
+      <figure class="isopleth" aria-label="Isopleth contour reading across the station network for the current hour">
+        <span class="grid-lines" aria-hidden="true"></span>
+        <svg viewBox="0 0 560 300" preserveAspectRatio="none" role="img">
+          <path class="iso-line l1 draw" d={contour(0.2, 14, 70)} />
+          <path class="iso-line l2 draw" d={contour(1.1, 18, 118)} />
+          <path class="iso-line l3 draw" d={contour(2.0, 22, 168)} />
+          <path class="iso-line l4 draw" d={contour(2.9, 26, 218)} />
+          <path class="iso-line l5 draw" d={contour(3.8, 30, 264)} />
+        </svg>
+        <figcaption class="iso-caption">
+          <span>ISOPLETH · gCO₂/kWh · 09 STATIONS</span>
+          <span class="rise">gradient rises SW &rarr; foundry belt</span>
+        </figcaption>
+      </figure>
+    </div>
+  </section>
 
-    <!-- Marketing block (hidden by index.js once GitHub-signed-in). -->
-    <section class="marketing" id="marketing">
-      <h2 data-seq="A">How the vault works</h2>
-      <p class="tagline">
-        One centralized secrets manager for every AI coding agent. Define a key
-        once in <strong>shared</strong>; every project that references it picks up
-        the new value on the next run. One rotate updates them all.
-      </p>
-
-      <div class="feature-grid">
-        <div class="feature-card" data-tag="VAULT">
-          <h3>Your vault, your account</h3>
-          <p>Secrets sit in <code>&lt;you&gt;/envpact-secrets</code> on GitHub — a private repo only you can read. envpact never holds a token of yours.</p>
-        </div>
-        <div class="feature-card" data-tag="SHARED">
-          <h3>One key, many projects</h3>
-          <p>Set <code>OPENAI_API_KEY</code> once in shared. Every project that references <code>shared.OPENAI_API_KEY</code> resolves the new value next run.</p>
-        </div>
-        <div class="feature-card" data-tag="AGENTS">
-          <h3>Works with your agent</h3>
-          <p>MCP server for Claude Code, Cursor, Windsurf, Cline, Goose. Plus CLI, VS Code extension, GitHub Action, Python module.</p>
-        </div>
-        <div class="feature-card" data-tag="BROWSER">
-          <h3>Browser-only dashboard</h3>
-          <p>This page reads and writes your vault directly via the GitHub API. Your token stays in this tab's session only.</p>
-        </div>
+  <section class="band" id="readings">
+    <div class="wrap">
+      <div class="band-head">
+        <h2>This hour</h2>
+        <span class="addr">/net/rollup · 60s cadence</span>
       </div>
-
-      <div class="install-block">
-        <span class="comment"># add envpact to any agent that speaks MCP</span><br />
-        <span class="cmd">npx -y envpact-mcp</span><br /><br />
-        <span class="comment"># or generate .env from your vault with the CLI</span><br />
-        <span class="cmd">npx -y envpact-cli</span>
-      </div>
-
-      <p class="components">
-        Components:
-        <a href="https://github.com/chirag127/envpact-cli"><strong>CLI</strong></a> ·
-        <a href="https://github.com/chirag127/envpact-mcp"><strong>MCP server</strong></a> ·
-        <a href="https://github.com/chirag127/envpact-action"><strong>GitHub Action</strong></a> ·
-        <a href="https://marketplace.visualstudio.com/items?itemName=chirag127.envpact"><strong>VS Code</strong></a> ·
-        <a href="https://pypi.org/project/envpact/"><strong>Python</strong></a>
-      </p>
-    </section>
-
-    <!-- #app — the vault dashboard (rendered by /scripts/index.js).
-         Contains .login-hero + #login-btn when signed out of GitHub. -->
-    <div id="app">
-      <h2 id="connect" data-seq="B">Connect your vault</h2>
-      <div class="panel">
-        <div class="login-hero">
-          <h2>Sign in with GitHub to open your vault</h2>
-          <p>
-            Your envpact-secrets repo is the single source of truth. This
-            dashboard reads and writes it directly from your browser — no backend.
-          </p>
-          <button id="login-btn">Connect GitHub</button>
-          <div class="privacy-note">
-            <strong>Privacy model:</strong> your access token is stored only in
-            this tab's <code>sessionStorage</code> (cleared on close). Every API
-            call goes straight to <code>api.github.com</code>. No envpact server
-            is involved.
+      <div class="tiles">
+        {tiles.map((t) => (
+          <div class="tile" data-accent={t.accent}>
+            <div class="t-label">{t.label}</div>
+            <div class="t-value">{t.value}<span class="u">{t.unit}</span></div>
+            <div class={`t-trend ${t.dir}`}>{t.trend}</div>
+            <svg class="spark" viewBox="0 0 100 30" preserveAspectRatio="none" aria-hidden="true">
+              <path d={sparkPath(t.spark)} />
+            </svg>
           </div>
-        </div>
+        ))}
       </div>
     </div>
+  </section>
 
-    <div id="pinned-mount"></div>
-  </main>
+  <section class="band" id="trend">
+    <div class="wrap split">
+      <div class="chart-panel">
+        <div class="cp-head">
+          <h3>24-hour recorder</h3>
+          <div class="legend">
+            <span><i style="background:var(--verdigris)"></i>Sequestered</span>
+            <span><i style="background:var(--ochre)"></i>Carbon</span>
+          </div>
+        </div>
+        <svg class="chart" viewBox={`0 0 ${CW} ${CH}`} role="img" aria-label="24-hour strip chart: carbon intensity falling while sequestered load rises">
+          <defs>
+            <linearGradient id="gv" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="var(--verdigris)" stop-opacity="0.28" />
+              <stop offset="100%" stop-color="var(--verdigris)" stop-opacity="0" />
+            </linearGradient>
+            <linearGradient id="go" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="var(--ochre)" stop-opacity="0.22" />
+              <stop offset="100%" stop-color="var(--ochre)" stop-opacity="0" />
+            </linearGradient>
+          </defs>
+          {[0, 15, 30, 45, 60].map((v) => (
+            <line class="gridline" x1={PAD} y1={yAt(v)} x2={CW - PAD} y2={yAt(v)} />
+          ))}
+          <line class="axis" x1={PAD} y1={CH - PAD} x2={CW - PAD} y2={CH - PAD} />
+          <path class="area-o" d={areaPath(carbon)} />
+          <path class="area-v" d={areaPath(offset)} />
+          <path class="stroke-o" d={linePath(carbon)} />
+          <path class="stroke-v" d={linePath(offset)} />
+          {[0, 6, 12, 18, 23].map((i) => (
+            <text class="tick" x={xAt(i)} y={CH - PAD + 16} text-anchor="middle">{`${String(i).padStart(2, '0')}:00`}</text>
+          ))}
+        </svg>
+      </div>
+      <div class="log-panel" id="log">
+        <table>
+          <thead>
+            <tr><th>Station</th><th>Metric</th><th>Reading</th><th>Flag</th></tr>
+          </thead>
+          <tbody>
+            {log.map((r) => (
+              <tr>
+                <td><strong style="color:var(--chalk);font-weight:600">{r.station}</strong><br /><span style="font-family:var(--font-mono);font-size:11px;color:var(--faint)">{r.ts}</span></td>
+                <td>{r.metric}</td>
+                <td><span class="st">{r.reading}</span></td>
+                <td><span class={`flag ${r.flag}`}>{r.flag}</span></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
 
-  <script type="module" src="/scripts/index.js"></script>
-</BaseLayout>
+  <section class="band" id="account">
+    <div class="wrap">
+      <div class="band-head">
+        <h2>Your baseline</h2>
+        <span class="addr">/me · signed with oriz account</span>
+      </div>
+      <AccountPanel client:load />
+    </div>
+  </section>
+</Station>
